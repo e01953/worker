@@ -206,7 +206,7 @@ class DockerFunctions:
     def create_container_host_config(self, port_binds, volumes, devices, privileged, network_mode,
                                      restart_policy='unless-stopped'):
         try:
-            if restart_policy == "unless-stopped" or restart_policy == "on-failure" or restart_policy == "always":
+            if restart_policy == "unless-stopped" or restart_policy == "no" or  restart_policy == "on-failure" or restart_policy == "always":
                 restart_policy = {'Name': restart_policy}
             return self.cli.create_host_config(port_bindings=port_binds, restart_policy=restart_policy, binds=volumes,
                                                devices=devices, privileged=privileged, network_mode=network_mode)

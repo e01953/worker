@@ -159,7 +159,7 @@ def start_containers(app_json, force_pull=True):
                                                                  port_list, app_json["env_vars"], version_name,
                                                                  app_json["volumes"], app_json["devices"],
                                                                  app_json["privileged"], app_json["networks"],
-                                                                 "unless-stopped"))
+                                                                 "no"))
             threads.append(t)
             t.start()
             container_number = container_number + 1
