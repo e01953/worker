@@ -98,12 +98,15 @@ class DockerFunctions:
             print("logging in to registry")
             try:
                 print(self.cli.login(username=registry_user, password=registry_pass, registry=registry_host))
+                return True
             except Exception as e:
                 print(e, file=sys.stderr)
                 print("problem logging into registry")
-                os._exit(2)
+                return False
+                #os._exit(2)
         else:
             print("no registry user pass combo defined, skipping registry login")
+            return False
 
     # pull image with optional version tag and registry auth
     def pull_image(self, image_name, version_tag="latest"):
@@ -112,10 +115,12 @@ class DockerFunctions:
             print(image_name)
             for line in self.cli.pull(image_name, str(version_tag), stream=True):
                 print(json.dumps(json.loads(line), indent=4))
+            return True
         except Exception as e:
             print(e, file=sys.stderr)
             print("problem pulling image " + image_name + ":" + str(version_tag))
-            os._exit(2)
+            return False
+            #os._exit(2)
 
     # prune unused images
     def prune_images(self):

@@ -35,8 +35,10 @@ def restart_containers(app_json, force_pull=True):
     time.sleep(randint(0, max_restart_wait_in_seconds))
     # pull image to speed up downtime between stop & start
     if force_pull is True:
-        docker_socket.pull_image(image_name, version_tag=version_name)
+        response = docker_socket.pull_image(image_name, version_tag=version_name)
     # stop running containers
+    if response is False:
+        return  
     stop_containers(app_json)
     # start new containers
     start_containers(app_json, force_pull=False)
@@ -136,7 +138,9 @@ def start_containers(app_json, force_pull=True):
         containers_needed = containers_required(app_json)
         # pull required image
         if force_pull is True:
-            docker_socket.pull_image(image_name, version_tag=version_name)
+           response = docker_socket.pull_image(image_name, version_tag=version_name)
+           if response is False:
+               return
         # start new containers
         container_number = 1
         threads = []
@@ -273,8 +277,15 @@ if __name__ == "__main__":
 
         # login to the docker registry - if no registry login details are configured will just print a message stating
         # that
-        docker_socket.registry_login(registry_host=registry_host, registry_user=registry_auth_user,
+        is_registry_logged_in = True
+        try:
+                response = docker_socket.registry_login(registry_host=registry_host, registry_user=registry_auth_user,
                                      registry_pass=registry_auth_password)
+                if response is False:
+                       is_registry_logged_in = False 
+        except Exception as e:
+                is_registry_logged_in = False
+                print("Failed to Login in registry")
 
         # login to the nebula manager
         nebula_connection = Nebula(username=nebula_manager_auth_user, password=nebula_manager_auth_password,
@@ -290,19 +301,21 @@ if __name__ == "__main__":
                 print("nebula manager connection ok")
             else:
                 print("nebula manager initial connection check failure, dropping container")
-                os._exit(2)
+                #os._exit(2)
         except Exception as e:
             print(e, file=sys.stderr)
             print("error confirming connection to nebula manager - please check connection & authentication params and "
                   "that the manager is online")
-            os._exit(2)
+            #os._exit(2)
 
-        # stop all nebula managed containers on start to ensure a clean slate to work on
-        print("stopping all preexisting nebula managed app containers in order to ensure a clean slate on boot")
-        stop_containers({"app_name": ""}, container_type="all")
-
-        # get the initial device_group configuration and store it in memory
-        local_device_group_info = get_device_group_info(nebula_connection, device_group)
+        api_check = nebula_connection.check_api();
+        if api_check["status_code"] == 200 and api_check["reply"]["api_available"] is True:
+            # stop all nebula managed containers on start to ensure a clean slate to work on
+            print("stopping all preexisting nebula managed app containers in order to ensure a clean slate on boot")
+            stop_containers({"app_name": ""}, container_type="all")
+            # get the initial device_group configuration and store it in memory
+            local_device_group_info = get_device_group_info(nebula_connection, device_group)
+        
 
         # make sure the device_group exists in the nebula cluster
         while local_device_group_info["status_code"] == 403 and \
@@ -379,11 +392,24 @@ if __name__ == "__main__":
 
             # wait the configurable time before checking the device_group info page again
             time.sleep(nebula_manager_check_in_time)
+            
+            if is_registry_logged_in is False:
+                try:
+                    response = docker_socket.registry_login(registry_host=registry_host, registry_user=registry_auth_user,
+                                     registry_pass=registry_auth_password)
+                    if response is False:
+                        is_registry_logged_in = False
+                    else:
+                        is_registry_logged_in = True
+                except Exception as e:
+                    print("Failed to Login in registry")
+            
 
             monotonic_id_increase = False
 
             # get the device_group configuration
             remote_device_group_info = get_device_group_info(nebula_connection, device_group)
+            
 
             # logic that checks if each of the app_id was increased and updates the app containers if the answer is yes
             # the logic also starts containers of newly added apps to the device_group
@@ -494,5 +520,5 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(e, file=sys.stderr)
-        print("failed main loop - exiting")
+        print("failed main loop - exiting",e)
         os._exit(2)
