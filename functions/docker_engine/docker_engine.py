@@ -91,36 +91,34 @@ class DockerFunctions:
             container_healthy = True
         return container_healthy
 
-    # login to docker registry
+        # login to docker registry
+
     def registry_login(self, registry_user=None, registry_pass=None, registry_host=""):
         if registry_user is not None and registry_user != "skip" and registry_pass is not None and \
                 registry_pass != "skip":
             print("logging in to registry")
             try:
                 print(self.cli.login(username=registry_user, password=registry_pass, registry=registry_host))
-                return True
             except Exception as e:
                 print(e, file=sys.stderr)
                 print("problem logging into registry")
-                return False
-                #os._exit(2)
+                raise e;
         else:
             print("no registry user pass combo defined, skipping registry login")
-            return False
 
-    # pull image with optional version tag and registry auth
+        # pull image with optional version tag and registry auth
+
     def pull_image(self, image_name, version_tag="latest"):
         print("pulling image " + image_name + ":" + str(version_tag))
         try:
             print(image_name)
             for line in self.cli.pull(image_name, str(version_tag), stream=True):
                 print(json.dumps(json.loads(line), indent=4))
-            return True
         except Exception as e:
             print(e, file=sys.stderr)
             print("problem pulling image " + image_name + ":" + str(version_tag))
-            return False
-            #os._exit(2)
+            os._exit(2)
+
 
     # prune unused images
     def prune_images(self):
