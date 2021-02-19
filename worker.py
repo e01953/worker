@@ -395,125 +395,129 @@ if __name__ == "__main__":
 
             # wait the configurable time before checking the device_group info page again
             time.sleep(nebula_manager_check_in_time)
+            try:
+                nebula_connection = check_required_connections(registry_host, registry_auth_user, registry_auth_password,
+                                                               nebula_manager_auth_user, nebula_manager_auth_password,
+                                                               nebula_manager_host, nebula_manager_port,
+                                                               nebula_manager_protocol,
+                                                               nebula_manager_uri, nebula_manager_request_timeout,
+                                                               nebula_manager_auth_token)
 
-            nebula_connection = check_required_connections(registry_host, registry_auth_user, registry_auth_password,
-                                                           nebula_manager_auth_user, nebula_manager_auth_password,
-                                                           nebula_manager_host, nebula_manager_port,
-                                                           nebula_manager_protocol,
-                                                           nebula_manager_uri, nebula_manager_request_timeout,
-                                                           nebula_manager_auth_token)
+                monotonic_id_increase = False
 
-            monotonic_id_increase = False
+                # get the device_group configuration
+                remote_device_group_info = get_device_group_info(nebula_connection, device_group)
 
-            # get the device_group configuration
-            remote_device_group_info = get_device_group_info(nebula_connection, device_group)
-
-            # logic that checks if each of the app_id was increased and updates the app containers if the answer is yes
-            # the logic also starts containers of newly added apps to the device_group
-            for remote_nebula_app in remote_device_group_info["reply"]["apps"]:
-                if remote_nebula_app["app_name"] in local_device_group_info["reply"]["apps_list"]:
-                    local_app_index = local_device_group_info["reply"]["apps_list"].index(remote_nebula_app["app_name"])
-                    if remote_nebula_app["app_id"] > local_device_group_info["reply"]["apps"][local_app_index]["app_id"]:
-                        monotonic_id_increase = True
-                        if remote_nebula_app["running"] is False:
-                            print("stopping app " + remote_nebula_app["app_name"] +
-                                  " do to changes in the app configuration")
-                            stop_containers(remote_nebula_app)
-                        elif remote_nebula_app["rolling_restart"] is True and \
-                                local_device_group_info["reply"]["apps"][local_app_index]["running"] is True:
-                            print("rolling app " + remote_nebula_app["app_name"] +
-                                  " do to changes in the app configuration")
-                            roll_containers(remote_nebula_app)
-                        else:
-                            print("restarting app " + remote_nebula_app["app_name"] +
-                                  " do to changes in the app configuration")
-                            restart_containers(remote_nebula_app)
-                else:
-                    print(("restarting app " + remote_nebula_app["app_name"] + " do to changes in the app "
-                                                                               "configuration"))
-                    monotonic_id_increase = True
-                    restart_containers(remote_nebula_app)
-
-            # logic that removes containers of apps that was removed from the device_group
-            if remote_device_group_info["reply"]["device_group_id"] > local_device_group_info["reply"]["device_group_id"]:
-                monotonic_id_increase = True
-                for local_nebula_app in local_device_group_info["reply"]["apps"]:
-                    if local_nebula_app["app_name"] not in remote_device_group_info["reply"]["apps_list"]:
-                        print("removing app " + local_nebula_app["app_name"] +
-                              " do to changes in the app configuration")
-                        stop_containers(local_nebula_app)
-
-            # logic that checks if each of the cron_job_id was increased and updates the cron_job containers if the
-            # answer is yes, the logic also starts containers of newly added cron_jobs to the device_group
-            for remote_nebula_cron_job in remote_device_group_info["reply"]["cron_jobs"]:
-                if remote_nebula_cron_job["cron_job_name"] in local_device_group_info["reply"]["cron_jobs_list"]:
-                    local_cron_job_index = local_device_group_info["reply"]["cron_jobs_list"].index(remote_nebula_cron_job["cron_job_name"])
-                    if remote_nebula_cron_job["cron_job_id"] > local_device_group_info["reply"]["cron_jobs"][local_cron_job_index]["cron_job_id"]:
-                        monotonic_id_increase = True
-                        if remote_nebula_cron_job["running"] is False:
-                            print("removing cron_job " + remote_nebula_cron_job["cron_job_name"] +
-                                  " schedule do to changes in the app configuration")
-                            cron_job_object.remove_cron_job(remote_nebula_cron_job["cron_job_name"])
-                            cron_next_run_dict.pop(remote_nebula_cron_job["cron_job_name"], None)
-                        else:
-                            print("updating cron_job " + remote_nebula_cron_job["cron_job_name"] +
-                                  " schedule do to changes in the app configuration")
-                            cron_next_run_dict[remote_nebula_cron_job["cron_job_name"]] = \
-                                cron_job_object.update_cron_job(remote_nebula_cron_job["cron_job_name"],
-                                                                remote_nebula_cron_job["schedule"])
-                else:
-                    monotonic_id_increase = True
-                    print("updating cron_job " + remote_nebula_cron_job["cron_job_name"] +
-                          " schedule do to changes in the app configuration")
-                    cron_next_run_dict[remote_nebula_cron_job["cron_job_name"]] = cron_job_object.add_cron_job(
-                        remote_nebula_cron_job["cron_job_name"], remote_nebula_cron_job["schedule"])
-
-            # logic that removes containers of apps that was removed from the device_group
-            if remote_device_group_info["reply"]["device_group_id"] > local_device_group_info["reply"]["device_group_id"]:
-                monotonic_id_increase = True
-                for local_nebula_cron_job in local_device_group_info["reply"]["cron_jobs"]:
-                    if local_nebula_cron_job["cron_job_name"] not in remote_device_group_info["reply"]["cron_jobs_list"]:
-                        print("removing cron_job " + local_nebula_cron_job["cron_job_name"] +
-                              " schedule do to changes in the app configuration")
-                        cron_job_object.remove_cron_job(local_nebula_cron_job["cron_job_name"])
-                        cron_next_run_dict.pop(local_nebula_cron_job["cron_job_name"], None)
-
-            # logic that starts cron_jobs according to their next scheduled run time then updates the next runtime
-            for cron_job_name, cron_job_next_run in cron_next_run_dict.items():
-                if datetime.now() > cron_job_next_run:
-                    local_cron_job_index = remote_device_group_info["reply"]["cron_jobs_list"].index(cron_job_name)
-                    cron_job_config = remote_device_group_info["reply"]["cron_jobs"][local_cron_job_index]
-                    start_cron_job_container(cron_job_config)
-                    cron_next_run_dict[cron_job_name] = cron_job_object.return_cron_job_next_runtime(cron_job_name)
-                    # clean previous completed cron containers
-                    prune_exited_containers(filters={"label": ["orchestrator=nebula", "container_type=cron_job"]})
-
-            # logic that runs image pruning if prune_id increased
-            if remote_device_group_info["reply"]["prune_id"] > local_device_group_info["reply"]["prune_id"]:
-                print("pruning images do to changes in the app configuration")
-                monotonic_id_increase = True
-                prune_images()
-
-            # set the in memory device_group info to be the one recently received if any id increased
-            if monotonic_id_increase is True:
-                local_device_group_info = remote_device_group_info
-
-            # send report to the optional kafka reporting if configured to be used
-            if kafka_bootstrap_servers is not None:
-                try:
-                    # if monotonic_id_increase is true something changed so any case we will want to report on it
-                    # otherwise we will report only if report_on_update_only is false
-                    if monotonic_id_increase is True or report_on_update_only is False:
-                        report = reporting_object.current_status_report(local_device_group_info, monotonic_id_increase)
-                        kafka_connection.push_report(report)
-                except Exception as e:
-                    print(e, file=sys.stderr)
-                    if reporting_fail_hard is False:
-                        print("failed reporting state to kafka")
-                        pass
+                # logic that checks if each of the app_id was increased and updates the app containers if the answer is yes
+                # the logic also starts containers of newly added apps to the device_group
+                for remote_nebula_app in remote_device_group_info["reply"]["apps"]:
+                    if remote_nebula_app["app_name"] in local_device_group_info["reply"]["apps_list"]:
+                        local_app_index = local_device_group_info["reply"]["apps_list"].index(remote_nebula_app["app_name"])
+                        if remote_nebula_app["app_id"] > local_device_group_info["reply"]["apps"][local_app_index]["app_id"]:
+                            monotonic_id_increase = True
+                            if remote_nebula_app["running"] is False:
+                                print("stopping app " + remote_nebula_app["app_name"] +
+                                      " do to changes in the app configuration")
+                                stop_containers(remote_nebula_app)
+                            elif remote_nebula_app["rolling_restart"] is True and \
+                                    local_device_group_info["reply"]["apps"][local_app_index]["running"] is True:
+                                print("rolling app " + remote_nebula_app["app_name"] +
+                                      " do to changes in the app configuration")
+                                roll_containers(remote_nebula_app)
+                            else:
+                                print("restarting app " + remote_nebula_app["app_name"] +
+                                      " do to changes in the app configuration")
+                                restart_containers(remote_nebula_app)
                     else:
-                        print("failed reporting state to kafka - exiting")
-                        os._exit(2)
+                        print(("restarting app " + remote_nebula_app["app_name"] + " do to changes in the app "
+                                                                                   "configuration"))
+                        monotonic_id_increase = True
+                        restart_containers(remote_nebula_app)
+
+                # logic that removes containers of apps that was removed from the device_group
+                if remote_device_group_info["reply"]["device_group_id"] > local_device_group_info["reply"]["device_group_id"]:
+                    monotonic_id_increase = True
+                    for local_nebula_app in local_device_group_info["reply"]["apps"]:
+                        if local_nebula_app["app_name"] not in remote_device_group_info["reply"]["apps_list"]:
+                            print("removing app " + local_nebula_app["app_name"] +
+                                  " do to changes in the app configuration")
+                            stop_containers(local_nebula_app)
+
+                # logic that checks if each of the cron_job_id was increased and updates the cron_job containers if the
+                # answer is yes, the logic also starts containers of newly added cron_jobs to the device_group
+                for remote_nebula_cron_job in remote_device_group_info["reply"]["cron_jobs"]:
+                    if remote_nebula_cron_job["cron_job_name"] in local_device_group_info["reply"]["cron_jobs_list"]:
+                        local_cron_job_index = local_device_group_info["reply"]["cron_jobs_list"].index(remote_nebula_cron_job["cron_job_name"])
+                        if remote_nebula_cron_job["cron_job_id"] > local_device_group_info["reply"]["cron_jobs"][local_cron_job_index]["cron_job_id"]:
+                            monotonic_id_increase = True
+                            if remote_nebula_cron_job["running"] is False:
+                                print("removing cron_job " + remote_nebula_cron_job["cron_job_name"] +
+                                      " schedule do to changes in the app configuration")
+                                cron_job_object.remove_cron_job(remote_nebula_cron_job["cron_job_name"])
+                                cron_next_run_dict.pop(remote_nebula_cron_job["cron_job_name"], None)
+                            else:
+                                print("updating cron_job " + remote_nebula_cron_job["cron_job_name"] +
+                                      " schedule do to changes in the app configuration")
+                                cron_next_run_dict[remote_nebula_cron_job["cron_job_name"]] = \
+                                    cron_job_object.update_cron_job(remote_nebula_cron_job["cron_job_name"],
+                                                                    remote_nebula_cron_job["schedule"])
+                    else:
+                        monotonic_id_increase = True
+                        print("updating cron_job " + remote_nebula_cron_job["cron_job_name"] +
+                              " schedule do to changes in the app configuration")
+                        cron_next_run_dict[remote_nebula_cron_job["cron_job_name"]] = cron_job_object.add_cron_job(
+                            remote_nebula_cron_job["cron_job_name"], remote_nebula_cron_job["schedule"])
+
+                # logic that removes containers of apps that was removed from the device_group
+                if remote_device_group_info["reply"]["device_group_id"] > local_device_group_info["reply"]["device_group_id"]:
+                    monotonic_id_increase = True
+                    for local_nebula_cron_job in local_device_group_info["reply"]["cron_jobs"]:
+                        if local_nebula_cron_job["cron_job_name"] not in remote_device_group_info["reply"]["cron_jobs_list"]:
+                            print("removing cron_job " + local_nebula_cron_job["cron_job_name"] +
+                                  " schedule do to changes in the app configuration")
+                            cron_job_object.remove_cron_job(local_nebula_cron_job["cron_job_name"])
+                            cron_next_run_dict.pop(local_nebula_cron_job["cron_job_name"], None)
+
+                # logic that starts cron_jobs according to their next scheduled run time then updates the next runtime
+                for cron_job_name, cron_job_next_run in cron_next_run_dict.items():
+                    if datetime.now() > cron_job_next_run:
+                        local_cron_job_index = remote_device_group_info["reply"]["cron_jobs_list"].index(cron_job_name)
+                        cron_job_config = remote_device_group_info["reply"]["cron_jobs"][local_cron_job_index]
+                        start_cron_job_container(cron_job_config)
+                        cron_next_run_dict[cron_job_name] = cron_job_object.return_cron_job_next_runtime(cron_job_name)
+                        # clean previous completed cron containers
+                        prune_exited_containers(filters={"label": ["orchestrator=nebula", "container_type=cron_job"]})
+
+                # logic that runs image pruning if prune_id increased
+                if remote_device_group_info["reply"]["prune_id"] > local_device_group_info["reply"]["prune_id"]:
+                    print("pruning images do to changes in the app configuration")
+                    monotonic_id_increase = True
+                    prune_images()
+
+                # set the in memory device_group info to be the one recently received if any id increased
+                if monotonic_id_increase is True:
+                    local_device_group_info = remote_device_group_info
+
+                # send report to the optional kafka reporting if configured to be used
+                if kafka_bootstrap_servers is not None:
+                    try:
+                        # if monotonic_id_increase is true something changed so any case we will want to report on it
+                        # otherwise we will report only if report_on_update_only is false
+                        if monotonic_id_increase is True or report_on_update_only is False:
+                            report = reporting_object.current_status_report(local_device_group_info, monotonic_id_increase)
+                            kafka_connection.push_report(report)
+                    except Exception as e:
+                        print(e, file=sys.stderr)
+                        if reporting_fail_hard is False:
+                            print("failed reporting state to kafka")
+                            pass
+                        else:
+                            print("failed reporting state to kafka - exiting")
+                            os._exit(2)
+
+            except Exception as e:
+                print(e, file=sys.stderr)
+                print("Error in while loop, retrying")
 
     except Exception as e:
         print(e, file=sys.stderr)
