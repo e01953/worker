@@ -313,12 +313,13 @@ if __name__ == "__main__":
                                    nebula_manager_uri, nebula_manager_request_timeout,
                                    nebula_manager_auth_token)
 
+        # get the initial device_group configuration and store it in memory
+        local_device_group_info = get_device_group_info(nebula_connection, device_group)
+
         # stop all nebula managed containers on start to ensure a clean slate to work on
         print("stopping all preexisting nebula managed app containers in order to ensure a clean slate on boot")
         stop_containers({"app_name": ""}, container_type="all")
 
-        # get the initial device_group configuration and store it in memory
-        local_device_group_info = get_device_group_info(nebula_connection, device_group)
 
         # make sure the device_group exists in the nebula cluster
         while local_device_group_info["status_code"] == 403 and \
