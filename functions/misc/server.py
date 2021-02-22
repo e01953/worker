@@ -9,7 +9,7 @@ def get_number_of_cpu_cores():
     except Exception as e:
         print(e, file=sys.stderr)
         print("error getting the number of cpu core")
-        os._exit(2)
+        #os._exit(2)
 
 
 # return numbers of cores
@@ -21,7 +21,7 @@ def get_total_memory_size_in_mb():
     except Exception as e:
         print(e, file=sys.stderr)
         print("error getting the memory size")
-        os._exit(2)
+        #os._exit(2)
 
 
 # return CPU usage percentage
@@ -32,7 +32,7 @@ def get_cpu_use_percentage():
     except Exception as e:
         print(e, file=sys.stderr)
         print("error getting cpu usage")
-        os._exit(2)
+        #os._exit(2)
 
 
 # return root HD usage
@@ -48,7 +48,7 @@ def get_root_disk_usage():
     except Exception as e:
         print(e, file=sys.stderr)
         print("error getting the root disk usage")
-        os._exit(2)
+        #os._exit(2)
 
 
 # return memory usage
@@ -65,7 +65,7 @@ def get_memory_usage():
     except Exception as e:
         print(e, file=sys.stderr)
         print("error getting memory usage")
-        os._exit(2)
+        #os._exit(2)
 
 
 # return host fqdn
@@ -75,4 +75,4 @@ def get_fqdn():
     except Exception as e:
         print(e, file=sys.stderr)
         print("error getting host fqdn")
-        os._exit(2)
+        #os._exit(2)

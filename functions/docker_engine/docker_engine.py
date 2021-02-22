@@ -30,7 +30,8 @@ class DockerFunctions:
             except Exception as e:
                 print(e, file=sys.stderr)
                 print("failed getting list of all containers")
-                os._exit(2)
+                raise e
+                #os._exit(2)
         elif app_name == "" and container_type != "all":
             try:
                 return self.cli.containers(filters={"label": ["orchestrator=nebula", "container_type=" + container_type]},
@@ -38,7 +39,8 @@ class DockerFunctions:
             except Exception as e:
                 print(e, file=sys.stderr)
                 print("failed getting list of all containers from type " + container_type)
-                os._exit(2)
+                raise e
+                #os._exit(2)
         else:
             try:
                 app_label = container_type + "_name=" + app_name
@@ -47,7 +49,8 @@ class DockerFunctions:
             except Exception as e:
                 print(e, file=sys.stderr)
                 print("failed getting list of containers where label is app_name=" + app_name)
-                os._exit(2)
+                raise e
+                #os._exit(2)
 
     # list containers stats on said container, if no app_name provided gets all of nebula managed apps, if all=True will
     # also show containers that have exited
@@ -62,7 +65,8 @@ class DockerFunctions:
         except Exception as e:
             print(e, file=sys.stderr)
             print("failed getting stats of containers where label is " + container_type + "_name=" + app_name)
-            os._exit(2)
+            raise e
+            #os._exit(2)
 
     # check if a container is healthy by examining the result of the dockerfile healthcheck, if no healthcheck is
     # configured assumes the container to always be healthy.
@@ -117,7 +121,7 @@ class DockerFunctions:
         except Exception as e:
             print(e, file=sys.stderr)
             print("problem pulling image " + image_name + ":" + str(version_tag))
-            os._exit(2)
+            raise e
 
 
     # prune unused images
@@ -128,7 +132,8 @@ class DockerFunctions:
         except Exception as e:
             print(e, file=sys.stderr)
             print("problem pruning unused image")
-            os._exit(2)
+            raise e
+            #os._exit(2)
 
     # create container
     def create_container(self, app_name, container_name, image_name, host_configuration, container_ports=[],
@@ -148,7 +153,8 @@ class DockerFunctions:
         except Exception as e:
             print(e, file=sys.stderr)
             print("failed creating container " + container_name)
-            os._exit(2)
+            raise e
+            #os._exit(2)
 
     # stop container, default timeout set to 5 seconds, will try to kill if stop failed
     def stop_container(self, container_name, stop_timout=5):
@@ -164,7 +170,8 @@ class DockerFunctions:
             except Exception as e:
                 print(e, file=sys.stderr)
                 print("problem stopping container " + container_name)
-                os._exit(2)
+                raise e
+                #os._exit(2)
 
     # start container
     def start_container(self, container_name):
@@ -177,7 +184,8 @@ class DockerFunctions:
         except not "APIError" as e:
             print(e, file=sys.stderr)
             print("problem starting container " + container_name)
-            os._exit(2)
+            raise e
+            #os._exit(2)
 
     # restart container, default timeout set to 2 seconds
     def restart_container(self, container_name, stop_timout=2):
@@ -190,7 +198,8 @@ class DockerFunctions:
         except not "APIError" as e:
             print(e, file=sys.stderr)
             print("problem restarting container " + container_name)
-            os._exit(2)
+            raise e
+            #os._exit(2)
 
     # remove container
     def remove_container(self, container_name):
@@ -203,7 +212,8 @@ class DockerFunctions:
             except Exception as e:
                 print(e, file=sys.stderr)
                 print("problem removing container " + container_name)
-            os._exit(2)
+            raise e
+            #os._exit(2)
 
     # create host_config
     def create_container_host_config(self, port_binds, volumes, devices, privileged, network_mode,
@@ -216,7 +226,8 @@ class DockerFunctions:
         except Exception as e:
             print(e, file=sys.stderr)
             print("problem creating host config")
-            os._exit(2)
+            raise e
+            #os._exit(2)
 
     # create networking_config
     def create_networking_config(self, starting_network=""):
@@ -230,7 +241,8 @@ class DockerFunctions:
         except Exception as e:
             print(e, file=sys.stderr)
             print("problem creating network config")
-            os._exit(2)
+            raise e
+            #os._exit(2)
 
     # connect a container to a network
     def connect_to_network(self, container, net_id):
@@ -239,7 +251,8 @@ class DockerFunctions:
         except Exception as e:
             print(e, file=sys.stderr)
             print("problem connecting to network " + net_id)
-            os._exit(2)
+            raise e
+            #os._exit(2)
 
     # get net_id
     def get_net_id(self, network):
@@ -282,7 +295,8 @@ class DockerFunctions:
                 except Exception as e:
                     print(e, file=sys.stderr)
                     print("problem connecting to network " + network)
-                    os._exit(2)
+                    raise e
+                    #os._exit(2)
 
     # stop and remove container
     def stop_and_remove_container(self, container_name):
@@ -297,4 +311,5 @@ class DockerFunctions:
         except Exception as e:
             print(e, file=sys.stderr)
             print("problem pruning unused image")
-            os._exit(2)
+            raise e
+            #os._exit(2)
