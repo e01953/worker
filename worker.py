@@ -329,8 +329,7 @@ if __name__ == "__main__":
                     local_device_group_info = get_device_group_info(nebula_connection, device_group)
                     if local_device_group_info and local_device_group_info["status_code"] != 403 and local_device_group_info["reply"]["device_group_exists"] is True :
                         break
-                    else:
-                        time.sleep(nebula_manager_check_in_time)
+                    time.sleep(nebula_manager_check_in_time)
                 except Exception as e:
                     print(e)
                     print("Error while fetching device group info. Retrying after manager checkin time...");
