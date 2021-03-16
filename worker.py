@@ -235,7 +235,7 @@ def check_required_connections(registry_host, registry_auth_user,registry_auth_p
             else:
                 print("nebula manager initial connection check failure, retrying in some time!")
         except Exception as e:
-            print(e, file=sys.stderr)
+            print(e)
             print(
                 "Error confirming connection to nebula manager or docker registry - please check connection & authentication params and "
                 "that the manager and docker-registry is online")
@@ -314,20 +314,33 @@ if __name__ == "__main__":
                                    nebula_manager_auth_token)
 
         try:
+
+            # start the object which will manage cron_jobs
+            cron_job_object = CronJobs()
+            cron_next_run_dict = {}
+
             # get the initial device_group configuration and store it in memory
-            local_device_group_info = get_device_group_info(nebula_connection, device_group)
+            #local_device_group_info = get_device_group_info(nebula_connection, device_group)
+            #print(("local_device_group_info status:: " + local_device_group_info["status_code"]))
+
+            while True:
+                try:
+                    print(("device_group " + device_group + " doesn't exist in nebula cluster, waiting for it to be created"))
+                    local_device_group_info = get_device_group_info(nebula_connection, device_group)
+                    if local_device_group_info and local_device_group_info["status_code"] != 403 and local_device_group_info["reply"]["device_group_exists"] is True :
+                        break
+                    else:
+                        time.sleep(nebula_manager_check_in_time)
+                except Exception as e:
+                    print(e)
+                    print("Error while fetching device group info. Retrying after manager checkin time...");
 
             # stop all nebula managed containers on start to ensure a clean slate to work on
-            print("stopping all preexisting nebula managed app containers in order to ensure a clean slate on boot")
+            print(
+                "stopping all preexisting nebula managed app containers in order to ensure a clean slate on boot")
             stop_containers({"app_name": ""}, container_type="all")
 
-            # make sure the device_group exists in the nebula cluster
-            while local_device_group_info["status_code"] == 403 and \
-                    local_device_group_info["reply"]["device_group_exists"] is False:
-                print(("device_group " + device_group + " doesn't exist in nebula cluster, waiting for it to be created"))
-                local_device_group_info = get_device_group_info(nebula_connection, device_group)
-                time.sleep(nebula_manager_check_in_time)
-
+            print("starting all apps that are set to running on boot")
             # start all apps that are set to running on boot
             for nebula_app in local_device_group_info["reply"]["apps"]:
                 if nebula_app["running"] is True:
@@ -335,10 +348,7 @@ if __name__ == "__main__":
                     start_containers(nebula_app)
                     print(("completed initial start of " + nebula_app["app_name"] + " app"))
 
-            # start the object which will manage cron_jobs
-            cron_job_object = CronJobs()
-            cron_next_run_dict = {}
-
+            print("adding all cron_jobs that are included in the device_group to this worker schedule")
             # add all cron_jobs that are included in the device_group to this worker schedule
             for nebula_cron_job in local_device_group_info["reply"]["cron_jobs"]:
                 if nebula_cron_job["running"] is True:
@@ -389,7 +399,7 @@ if __name__ == "__main__":
                         print("failed creating reporting object - exiting")
                         os._exit(2)
         except Exception as e:
-            print(e, file=sys.stderr)
+            print(e)
             print("manager and docker registry is up however worker failed at startup - retrying after checkin time")
         # loop forever
         print(("starting device_group " + device_group + " /info check loop, configured to check for changes every "
@@ -411,6 +421,7 @@ if __name__ == "__main__":
                 # get the device_group configuration
                 remote_device_group_info = get_device_group_info(nebula_connection, device_group)
 
+                print("logic that checks if each of the app_id was increased and updates the app containers");
                 # logic that checks if each of the app_id was increased and updates the app containers if the answer is yes
                 # the logic also starts containers of newly added apps to the device_group
                 for remote_nebula_app in remote_device_group_info["reply"]["apps"]:
@@ -446,6 +457,7 @@ if __name__ == "__main__":
                                   " do to changes in the app configuration")
                             stop_containers(local_nebula_app)
 
+                print("logic that checks if each of the cron_job_id was increased and updates the cron_job containers");
                 # logic that checks if each of the cron_job_id was increased and updates the cron_job containers if the
                 # answer is yes, the logic also starts containers of newly added cron_jobs to the device_group
                 for remote_nebula_cron_job in remote_device_group_info["reply"]["cron_jobs"]:
@@ -519,9 +531,9 @@ if __name__ == "__main__":
                             os._exit(2)
 
             except Exception as e:
-                print(e, file=sys.stderr)
+                print(e)
                 print("failed in while loop, retrying after check in time !!")
     except Exception as e:
-        print(e, file=sys.stderr)
+        print(e)
         print("failed main loop - exiting, something unexpected happened !!")
         os._exit(2)
