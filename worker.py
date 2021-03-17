@@ -378,7 +378,7 @@ if __name__ == "__main__":
                                                            nebula_manager_host, nebula_manager_port,
                                                            nebula_manager_protocol,
                                                            nebula_manager_uri, nebula_manager_request_timeout,
-                                                           nebula_manager_auth_token)
+                                                           nebula_manager_auth_token, nebula_manager_check_in_time)
 
             monotonic_id_increase = False
             try:
