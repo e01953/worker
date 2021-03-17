@@ -200,7 +200,7 @@ def restart_unhealthy_containers():
                 if docker_socket.check_container_healthy(nebula_container["Id"]) is False:
                     docker_socket.restart_container(nebula_container["Id"])
     except Exception as e:
-        print(e, file=sys.stderr)
+        print(e)
         print("failed checking containers health")
         #os._exit(2)
 
@@ -208,9 +208,9 @@ def restart_unhealthy_containers():
 def check_required_connections(registry_host, registry_auth_user,registry_auth_password,nebula_manager_auth_user, nebula_manager_auth_password,
                                    nebula_manager_host, nebula_manager_port, nebula_manager_protocol,
                                    nebula_manager_uri, nebula_manager_request_timeout,
-                                   nebula_manager_auth_token):
+                                   nebula_manager_auth_token, nebula_manager_check_in_time):
     while True:
-        time.sleep(10);
+        time.sleep(nebula_manager_check_in_time)
         try:
             # login to the docker registry - if no registry login details are configured will just print a message stating
             # that
@@ -307,102 +307,67 @@ if __name__ == "__main__":
         # ensure default "nebula" named network exists
         docker_socket.create_docker_network("nebula", "bridge")
 
+        while True:
+            try:
+                nebula_connection = check_required_connections(registry_host, registry_auth_user, registry_auth_password,
+                                                               nebula_manager_auth_user, nebula_manager_auth_password,
+                                                               nebula_manager_host, nebula_manager_port,
+                                                               nebula_manager_protocol,
+                                                               nebula_manager_uri, nebula_manager_request_timeout,
+                                                               nebula_manager_auth_token, nebula_manager_check_in_time)
 
-        nebula_connection = check_required_connections(registry_host, registry_auth_user,registry_auth_password,nebula_manager_auth_user, nebula_manager_auth_password,
-                                   nebula_manager_host, nebula_manager_port, nebula_manager_protocol,
-                                   nebula_manager_uri, nebula_manager_request_timeout,
-                                   nebula_manager_auth_token)
+                # start the object which will manage cron_jobs
+                cron_job_object = CronJobs()
+                cron_next_run_dict = {}
 
-        try:
+                # get the initial device_group configuration and store it in memory
+                local_device_group_info = get_device_group_info(nebula_connection, device_group)
 
-            # start the object which will manage cron_jobs
-            cron_job_object = CronJobs()
-            cron_next_run_dict = {}
+                # stop all nebula managed containers on start to ensure a clean slate to work on
+                print("stopping all preexisting nebula managed app containers in order to ensure a clean slate on boot")
+                stop_containers({"app_name": ""}, container_type="all")
 
-            # get the initial device_group configuration and store it in memory
-            #local_device_group_info = get_device_group_info(nebula_connection, device_group)
-            #print(("local_device_group_info status:: " + local_device_group_info["status_code"]))
-
-            while True:
-                try:
-                    print(("device_group " + device_group + " doesn't exist in nebula cluster, waiting for it to be created"))
+                # make sure the device_group exists in the nebula cluster
+                while local_device_group_info["status_code"] == 403 and \
+                        local_device_group_info["reply"]["device_group_exists"] is False:
+                    print(
+                    ("device_group " + device_group + " doesn't exist in nebula cluster, waiting for it to be created"))
                     local_device_group_info = get_device_group_info(nebula_connection, device_group)
-                    if local_device_group_info and local_device_group_info["status_code"] != 403 and local_device_group_info["reply"]["device_group_exists"] is True :
-                        break
                     time.sleep(nebula_manager_check_in_time)
-                except Exception as e:
-                    print(e)
-                    print("Error while fetching device group info. Retrying after manager checkin time...");
 
-            # stop all nebula managed containers on start to ensure a clean slate to work on
-            print(
-                "stopping all preexisting nebula managed app containers in order to ensure a clean slate on boot")
-            stop_containers({"app_name": ""}, container_type="all")
 
-            print("starting all apps that are set to running on boot")
-            # start all apps that are set to running on boot
-            for nebula_app in local_device_group_info["reply"]["apps"]:
-                if nebula_app["running"] is True:
-                    print(("initial start of " + nebula_app["app_name"] + " app"))
-                    start_containers(nebula_app)
-                    print(("completed initial start of " + nebula_app["app_name"] + " app"))
+                print("starting all apps that are set to running on boot")
+                # start all apps that are set to running on boot
+                for nebula_app in local_device_group_info["reply"]["apps"]:
+                    if nebula_app["running"] is True:
+                        print(("initial start of " + nebula_app["app_name"] + " app"))
+                        start_containers(nebula_app)
+                        print(("completed initial start of " + nebula_app["app_name"] + " app"))
 
-            print("adding all cron_jobs that are included in the device_group to this worker schedule")
-            # add all cron_jobs that are included in the device_group to this worker schedule
-            for nebula_cron_job in local_device_group_info["reply"]["cron_jobs"]:
-                if nebula_cron_job["running"] is True:
-                    print(("adding cron of " + nebula_cron_job["cron_job_name"] + " cron job"))
-                    cron_next_run_dict[nebula_cron_job["cron_job_name"]] = cron_job_object.add_cron_job(
-                        nebula_cron_job["cron_job_name"], nebula_cron_job["schedule"])
-                    print(("added initial cron of " + nebula_cron_job["cron_job_name"] + " cron job"))
+                print("adding all cron_jobs that are included in the device_group to this worker schedule")
+                # add all cron_jobs that are included in the device_group to this worker schedule
+                for nebula_cron_job in local_device_group_info["reply"]["cron_jobs"]:
+                    if nebula_cron_job["running"] is True:
+                        print(("adding cron of " + nebula_cron_job["cron_job_name"] + " cron job"))
+                        cron_next_run_dict[nebula_cron_job["cron_job_name"]] = cron_job_object.add_cron_job(
+                            nebula_cron_job["cron_job_name"], nebula_cron_job["schedule"])
+                        print(("added initial cron of " + nebula_cron_job["cron_job_name"] + " cron job"))
 
-            # open a thread which is in charge of restarting any containers which health check shows them as unhealthy
-            print("starting work container health checking thread")
-            Thread(target=restart_unhealthy_containers).start()
+                # open a thread which is in charge of restarting any containers which health check shows them as unhealthy
+                print("starting work container health checking thread")
+                Thread(target=restart_unhealthy_containers).start()
+                # no exception occur at startup hence breaking the loop
+                break;
+            except Exception as e:
+                print(e)
+                print("worker startup failed - retrying after checkin time")
+                time.sleep(nebula_manager_check_in_time)
 
-            # if the optional reporting system is configured start a kafka connection object that will be used to send the
-            # reports to
-            if kafka_bootstrap_servers is not None:
-                try:
-                    print("creating reporting kafka connection object")
-                    kafka_connection = KafkaConnection(kafka_bootstrap_servers,
-                                                       security_protocol=kafka_security_protocol,
-                                                       sasl_mechanism=kafka_sasl_mechanism,
-                                                       sasl_plain_username=kafka_sasl_plain_username,
-                                                       sasl_plain_password=kafka_sasl_plain_password,
-                                                       ssl_keyfile=kafka_ssl_keyfile,
-                                                       ssl_password=kafka_ssl_password,
-                                                       ssl_certfile=kafka_ssl_certfile,
-                                                       ssl_cafile=kafka_ssl_cafile,
-                                                       ssl_crlfile=kafka_ssl_crlfile,
-                                                       sasl_kerberos_service_name=kafka_sasl_kerberos_service_name,
-                                                       sasl_kerberos_domain_name=kafka_sasl_kerberos_domain_name,
-                                                       topic=kafka_topic)
-                except Exception as e:
-                    print(e, file=sys.stderr)
-                    if reporting_fail_hard is False:
-                        print("failed creating reporting kafka connection object")
-                        pass
-                    else:
-                        print("failed creating reporting kafka connection object - exiting")
-                        os._exit(2)
 
-                try:
-                    reporting_object = ReportingDocument(docker_socket, device_group)
-                except Exception as e:
-                    print(e, file=sys.stderr)
-                    if reporting_fail_hard is False:
-                        print("failed creating reporting object")
-                        pass
-                    else:
-                        print("failed creating reporting object - exiting")
-                        os._exit(2)
-        except Exception as e:
-            print(e)
-            print("manager and docker registry is up however worker failed at startup - retrying after checkin time")
         # loop forever
         print(("starting device_group " + device_group + " /info check loop, configured to check for changes every "
               + str(nebula_manager_check_in_time) + " seconds"))
+
         while True:
 
             # wait the configurable time before checking the device_group info page again
@@ -511,23 +476,6 @@ if __name__ == "__main__":
                 # set the in memory device_group info to be the one recently received if any id increased
                 if monotonic_id_increase is True:
                     local_device_group_info = remote_device_group_info
-
-                # send report to the optional kafka reporting if configured to be used
-                if kafka_bootstrap_servers is not None:
-                    try:
-                        # if monotonic_id_increase is true something changed so any case we will want to report on it
-                        # otherwise we will report only if report_on_update_only is false
-                        if monotonic_id_increase is True or report_on_update_only is False:
-                            report = reporting_object.current_status_report(local_device_group_info, monotonic_id_increase)
-                            kafka_connection.push_report(report)
-                    except Exception as e:
-                        print(e, file=sys.stderr)
-                        if reporting_fail_hard is False:
-                            print("failed reporting state to kafka")
-                            pass
-                        else:
-                            print("failed reporting state to kafka - exiting")
-                            os._exit(2)
 
             except Exception as e:
                 print(e)
