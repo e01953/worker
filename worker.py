@@ -210,7 +210,6 @@ def check_required_connections(registry_host, registry_auth_user,registry_auth_p
                                    nebula_manager_uri, nebula_manager_request_timeout,
                                    nebula_manager_auth_token, nebula_manager_check_in_time):
     while True:
-        time.sleep(nebula_manager_check_in_time)
         try:
             # login to the docker registry - if no registry login details are configured will just print a message stating
             # that
@@ -233,12 +232,14 @@ def check_required_connections(registry_host, registry_auth_user,registry_auth_p
                 # case when nebula manager and docker registry both are up and connected
                 return nebula_connection;
             else:
-                print("nebula manager initial connection check failure, retrying in some time!")
+                print("nebula manager initial connection check failure, retrying after " + str(nebula_manager_check_in_time) + " seconds")
+                time.sleep(nebula_manager_check_in_time)
         except Exception as e:
             print(e)
             print(
                 "Error confirming connection to nebula manager or docker registry - please check connection & authentication params and "
-                "that the manager and docker-registry is online")
+                "that the manager and docker-registry is online. Retrying after " + str(nebula_manager_check_in_time) + " seconds")
+            time.sleep(nebula_manager_check_in_time)
 
 
 # retry getting the device_group info
