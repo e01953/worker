@@ -117,7 +117,12 @@ class DockerFunctions:
         try:
             print(image_name)
             for line in self.cli.pull(image_name, str(version_tag), stream=True):
-                print(json.dumps(json.loads(line), indent=4))
+                line_json = json.loads(line)
+                print(json.dumps(line_json, indent=4))
+                
+                # if error reported in response, raise exception
+                if "error" in line_json:
+                    raise Exception("image pull failed for " + image_name + ":" + str(version_tag))
         except Exception as e:
             print(e, file=sys.stderr)
             print("problem pulling image " + image_name + ":" + str(version_tag))
@@ -153,8 +158,9 @@ class DockerFunctions:
         except Exception as e:
             print(e, file=sys.stderr)
             print("failed creating container " + container_name)
-            raise e
-            #os._exit(2)
+            # Too big error; let worker exit and retry
+            # raise e
+            os._exit(2)
 
     # stop container, default timeout set to 5 seconds, will try to kill if stop failed
     def stop_container(self, container_name, stop_timout=5):
