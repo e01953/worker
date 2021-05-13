@@ -246,6 +246,20 @@ def check_required_connections(registry_host, registry_auth_user,registry_auth_p
 @retry(wait_exponential_multiplier=200, wait_exponential_max=1000, stop_max_attempt_number=10)
 def get_device_group_info(nebula_connection_object, device_group_to_get_info):
     return nebula_connection_object.list_device_group_info(device_group_to_get_info)
+    
+
+# retry getting the device_group info into a file
+def save_device_group_id(device_group):
+	try:
+  		save_path = '/home'
+  		file_name = "device_group_info.txt"
+  		complete_name = os.path.join(save_path, file_name)
+  		info_file = open(complete_name, "w")
+  		info_file.write(device_group)
+  		info_file.close()
+	except Exception as e:
+		print(e)
+		print("Error while saving device group id into file")
 
 
 if __name__ == "__main__":
@@ -275,6 +289,8 @@ if __name__ == "__main__":
         max_restart_wait_in_seconds = parser.read_configuration_variable("max_restart_wait_in_seconds", default_value=0)
         device_group = parser.read_configuration_variable("device_group", required=True)
 
+        # save this device group id into a file
+        save_device_group_id(device_group)
         # the following config variables are for configuring Nebula workers optional reporting, being optional none of it
         # is mandatory
         reporting_fail_hard = parser.read_configuration_variable("reporting_fail_hard", default_value=True)
