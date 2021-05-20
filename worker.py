@@ -108,6 +108,8 @@ def start_cron_job_container(cron_job_json, force_pull=True, container_type="cro
         container_number = 1
         threads = []
         while container_number <= containers_needed:
+		    # passing device group id as env variable to the containers
+            app_json["env_vars"]["DEVICE_ID"] = device_group
             t = Thread(target=docker_socket.run_container, args=(cron_job_json["cron_job_name"],
                                                                  cron_job_json["cron_job_name"] + "-" +
                                                                  str(int(time.time())) + "-" + str(container_number),
@@ -143,6 +145,8 @@ def start_containers(app_json, force_pull=True):
         while container_number <= containers_needed:
             port_binds = dict()
             port_list = []
+            # passing device group id as env variable to the containers
+            app_json["env_vars"]["DEVICE_ID"] = device_group
             for x in app_json["starting_ports"]:
                 if isinstance(x, int):
                     port_binds[x] = x + container_number - 1
@@ -248,20 +252,6 @@ def get_device_group_info(nebula_connection_object, device_group_to_get_info):
     return nebula_connection_object.list_device_group_info(device_group_to_get_info)
     
 
-# retry getting the device_group info into a file
-def save_device_group_id(device_group):
-	try:
-  		save_path = '/home'
-  		file_name = "device_group_info.txt"
-  		complete_name = os.path.join(save_path, file_name)
-  		info_file = open(complete_name, "w")
-  		info_file.write(device_group)
-  		info_file.close()
-	except Exception as e:
-		print(e)
-		print("Error while saving device group id into file")
-
-
 if __name__ == "__main__":
 
     try:
@@ -289,8 +279,6 @@ if __name__ == "__main__":
         max_restart_wait_in_seconds = parser.read_configuration_variable("max_restart_wait_in_seconds", default_value=0)
         device_group = parser.read_configuration_variable("device_group", required=True)
 
-        # save this device group id into a file
-        save_device_group_id(device_group)
         # the following config variables are for configuring Nebula workers optional reporting, being optional none of it
         # is mandatory
         reporting_fail_hard = parser.read_configuration_variable("reporting_fail_hard", default_value=True)
