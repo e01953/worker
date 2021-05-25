@@ -1,0 +1,16 @@
+# To support cross platform, manifest should be created
+
+## Steps to create manifest -
+
+docker build -t jupitersiv/worker_pi_img:0.6_amd64 --build-arg ARCH=arm64v8/ .
+docker push jupitersiv/worker_pi_img:0.6_amd64
+
+docker build -t jupitersiv/worker_pi_img:0.6_arm32v7 --build-arg ARCH=arm32v7/ .
+docker push jupitersiv/worker_pi_img:0.6_arm32v7
+
+docker manifest create jupitersiv/worker_pi_img:0.6.beta --amend jupitersiv/worker_pi_img:0.6_amd64 --amend jupitersiv/worker_pi_img:0.6_arm32v7
+docker manifest push jupitersiv/worker_pi_img:0.6.beta
+
+
+################################################################
+Created on - 25 May 2021
